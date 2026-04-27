@@ -23,6 +23,18 @@ enum Status {
   REJECTED
 }
 
+// Добавлены языковые сегменты, включая турецкий (TR)
+enum Language {
+  RU
+  EN
+  DE
+  ES
+  FR
+  PL
+  TR
+  OTHER
+}
+
 model Lead {
   id          String   @id @default(uuid())
   name        String
@@ -30,8 +42,9 @@ model Lead {
   description String?
   platform    Platform @default(OTHER)
   status      Status   @default(NEW)
+  language    Language @default(RU) // По умолчанию русский сегмент
   aiScore     Int?     // Оценка от OpenRouter (1-10)
-  aiComment   String?  // Краткий комментарий ИИ почему такая оценка
+  aiComment   String?  // Краткий комментарий ИИ
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   notes       Note[]
@@ -48,6 +61,6 @@ model Note {
 model Keyword {
   id        String   @id @default(uuid())
   word      String   @unique
-  category  String?  // Например: "Для Мессира", "Для Технополиса"
+  category  String?  
   createdAt DateTime @default(now())
 }
