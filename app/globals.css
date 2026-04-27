@@ -3,21 +3,21 @@
 @tailwind utilities;
 
 body {
-  background-color: #0a0a0a;
-  color: #e0e0e0;
+  background-color: #050505;
+  color: #E5E4E2; /* Светло-серебристый по умолчанию */
 }
 
-/* Стилизация скроллбара под стиль */
+/* Стилизация скроллбара под матовое золото */
 ::-webkit-scrollbar {
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a0a; 
+  background: #050505; 
 }
 ::-webkit-scrollbar-thumb {
-  background: #aa8022; 
+  background: #8F7635; 
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #d4af37; 
+  background: #B89947; 
 }
