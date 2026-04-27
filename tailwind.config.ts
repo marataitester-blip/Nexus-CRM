@@ -9,14 +9,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#0a0a0a", // Глубокий черный
-        surface: "#141414",    // Чуть светлее для карточек
+        background: "#050505", // Глубокий черный фон
+        surface: "#111111",    // Чуть светлее для карточек/таблиц
         gold: {
-          DEFAULT: "#d4af37",  // Классическое золото
-          light: "#f3e5ab",
-          dark: "#aa8022",
+          DEFAULT: "#B89947",  // Матовое золото
+          light: "#D4B86A",
+          dark: "#8F7635",
         },
-        textMain: "#e0e0e0",   // Светло-серый для читаемости
+        silver: {
+          DEFAULT: "#C0C0C0",  // Классическое серебро
+          light: "#E5E4E2",    // Светлое серебро для читаемости
+          dark: "#808080",
+        },
+        textMain: "#E5E4E2",   // Основной текст будет серебристым
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
