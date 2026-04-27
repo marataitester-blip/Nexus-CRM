@@ -23,7 +23,6 @@ enum Status {
   REJECTED
 }
 
-// Добавлены языковые сегменты, включая турецкий (TR)
 enum Language {
   RU
   EN
@@ -42,9 +41,9 @@ model Lead {
   description String?
   platform    Platform @default(OTHER)
   status      Status   @default(NEW)
-  language    Language @default(RU) // По умолчанию русский сегмент
-  aiScore     Int?     // Оценка от OpenRouter (1-10)
-  aiComment   String?  // Краткий комментарий ИИ
+  language    Language @default(RU)
+  aiScore     Int?     
+  aiComment   String?  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   notes       Note[]
@@ -63,4 +62,11 @@ model Keyword {
   word      String   @unique
   category  String?  
   createdAt DateTime @default(now())
+}
+
+// НОВАЯ ТАБЛИЦА: Системные настройки (хранение сессии Telegram)
+model SystemConfig {
+  id              String   @id @default("global_config")
+  tgSessionString String?  // Сюда запишется ключ доступа после авторизации
+  updatedAt       DateTime @updatedAt
 }
