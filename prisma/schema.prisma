@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Platform {
+  TELEGRAM
+  YOUTUBE
+  KICKSTARTER
+  WEB
+  OTHER
+}
+
+enum Status {
+  NEW
+  CONTACTED
+  NEGOTIATING
+  PARTNER
+  REJECTED
+}
+
+model Lead {
+  id          String   @id @default(uuid())
+  name        String
+  url         String   @unique
+  description String?
+  platform    Platform @default(OTHER)
+  status      Status   @default(NEW)
+  aiScore     Int?     // Оценка от OpenRouter (1-10)
+  aiComment   String?  // Краткий комментарий ИИ почему такая оценка
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  notes       Note[]
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  text      String
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Keyword {
+  id        String   @id @default(uuid())
+  word      String   @unique
+  category  String?  // Например: "Для Мессира", "Для Технополиса"
+  createdAt DateTime @default(now())
+}
