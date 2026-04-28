@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { TelegramClient, Api } from 'telegram';
 import { StringSession } from 'telegram/sessions';
-import prisma from '../../../../lib/prisma'; // Подключаем вашу базу данных
+import prisma from '../../../../lib/prisma';
 
 export const maxDuration = 60; // Даем Vercel время на парсинг и анализ
 
@@ -34,7 +34,8 @@ export async function POST(request: Request) {
     let participantsCount = 0;
     try {
       const fullChannel = await client.invoke(new Api.channels.GetFullChannel({ channel: channelUsername }));
-      participantsCount = fullChannel.fullChat.participantsCount || 0;
+      // Обходим строгую типизацию TypeScript с помощью (as any)
+      participantsCount = (fullChannel.fullChat as any).participantsCount || 0;
     } catch (e) {
       console.warn("Не удалось получить точное количество подписчиков. Канал может быть закрытым.");
     }
