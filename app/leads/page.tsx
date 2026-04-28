@@ -1,139 +1,87 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-// Типы для фронтенда
-type Lead = {
+interface Lead {
   id: string;
   name: string;
   url: string;
-  platform: string;
-  status: string;
-  language: string;
-  aiScore: number | null;
-  aiComment: string | null;
-};
-
-// Добавлен турецкий язык (TR)
-const LANGUAGES = ['RU', 'EN', 'DE', 'ES', 'FR', 'PL', 'TR', 'OTHER'];
+  description: string;
+  aiScore: number;
+  aiComment: string;
+  createdAt: string;
+}
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [activeLang, setActiveLang] = useState('RU');
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchLeads(activeLang);
-  }, [activeLang]);
-
-  const fetchLeads = async (lang: string) => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/leads?lang=${lang}`);
-      const data = await res.json();
-      setLeads(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Ошибка загрузки:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    fetch('/api/leads')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setLeads(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   return (
-    <main className="min-h-screen bg-background text-textMain p-6">
-      
-      {/* Навигация */}
-      <nav className="flex justify-between items-center border-b border-gold/20 pb-4 mb-8">
-        <Link href="/" className="text-2xl font-serif text-gold tracking-widest uppercase hover:text-gold/80 transition-colors">
-          Nexus CRM
-        </Link>
-        <div className="text-sm uppercase tracking-widest text-textMain/50">
-          Директория Партнеров
+    <main className="min-h-screen bg-background p-8 text-silver-light">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-12 border-b border-gold/20 pb-6">
+          <div>
+            <h1 className="text-3xl font-serif text-gold uppercase tracking-tighter">Архив Эфира</h1>
+            <p className="text-xs text-gold/50 uppercase tracking-[0.3em] mt-1">База найденных партнеров</p>
+          </div>
+          <Link href="/" className="px-6 py-2 border border-gold/50 text-gold hover:bg-gold hover:text-background transition-all text-sm uppercase font-bold tracking-widest">
+            На Радар
+          </Link>
         </div>
-      </nav>
 
-      {/* Языковые вкладки */}
-      <div className="flex justify-center flex-wrap gap-4 mb-8">
-        {LANGUAGES.map((lang) => (
-          <button
-            key={lang}
-            onClick={() => setActiveLang(lang)}
-            className={`px-6 py-2 rounded-sm border uppercase font-bold tracking-wider transition-all ${
-              activeLang === lang 
-                ? 'bg-gold text-background border-gold' 
-                : 'bg-surface text-textMain border-gold/30 hover:border-gold'
-            }`}
-          >
-            {lang}
-          </button>
-        ))}
-      </div>
-
-      {/* Таблица */}
-      <div className="overflow-x-auto bg-surface rounded-md border border-gold/20 shadow-lg">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-background border-b border-gold/20 uppercase tracking-wider text-xs text-gold/70">
-              <th className="p-4 font-normal">Название / Ссылка</th>
-              <th className="p-4 font-normal">Платформа</th>
-              <th className="p-4 font-normal">Статус</th>
-              <th className="p-4 font-normal">AI Рейтинг</th>
-              <th className="p-4 font-normal w-1/3">AI Комментарий</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-gold">Загрузка данных...</td>
-              </tr>
-            ) : leads.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="p-8 text-center text-textMain/50">В сегменте {activeLang} пока нет записей.</td>
-              </tr>
-            ) : (
-              leads.map((lead) => (
-                <tr key={lead.id} className="border-b border-gold/10 hover:bg-gold/5 transition-colors">
-                  <td className="p-4">
-                    <div className="font-bold text-white">{lead.name}</div>
-                    <a href={lead.url} target="_blank" rel="noreferrer" className="text-xs text-gold/80 hover:text-gold underline">
+        {loading ? (
+          <div className="text-center py-20 animate-pulse text-gold uppercase tracking-widest">Считывание данных...</div>
+        ) : leads.length === 0 ? (
+          <div className="text-center py-20 border border-dashed border-gold/20 rounded">
+            <p className="text-silver/50">В базе пока пусто. Запустите сканер на главной.</p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {leads.map((lead) => (
+              <div key={lead.id} className="bg-surface border border-gold/10 p-6 rounded-sm hover:border-gold/40 transition-all group shadow-lg">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-xl font-serif text-gold mb-1 group-hover:text-gold-light transition-colors">
+                      {lead.name}
+                    </h3>
+                    <a href={lead.url} target="_blank" rel="noopener noreferrer" className="text-xs text-silver/60 hover:text-gold underline break-all">
                       {lead.url}
                     </a>
-                  </td>
-                  <td className="p-4 text-sm">{lead.platform}</td>
-                  <td className="p-4">
-                    <span className="px-2 py-1 text-xs rounded border border-gold/50 bg-background text-gold">
-                      {lead.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    {lead.aiScore ? (
-                      <div className="flex items-center gap-2">
-                        <span className={`font-bold ${lead.aiScore >= 8 ? 'text-green-500' : lead.aiScore >= 5 ? 'text-yellow-500' : 'text-red-500'}`}>
-                          {lead.aiScore}/10
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-textMain/30">-</span>
-                    )}
-                  </td>
-                  <td className="p-4 text-sm text-textMain/80 italic">
-                    {lead.aiComment || '-'}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <div className="text-3xl font-serif text-gold leading-none">{lead.aiScore}</div>
+                    <div className="text-[10px] uppercase tracking-tighter text-gold/50">Рейтинг ИИ</div>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-silver/80 mb-4 italic leading-relaxed line-clamp-2">
+                  {lead.description}
+                </p>
+                
+                <div className="bg-background/50 p-3 border-l-2 border-gold/30">
+                  <span className="text-[10px] uppercase text-gold/60 font-bold block mb-1">Анализ Мессира:</span>
+                  <p className="text-xs text-silver-light">{lead.aiComment}</p>
+                </div>
+                
+                <div className="mt-4 text-[9px] text-silver/30 uppercase tracking-widest text-right">
+                  Зафиксировано: {new Date(lead.createdAt).toLocaleString('ru-RU')}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-
-      {/* Кнопка ручного добавления (строго по центру) */}
-      <div className="flex justify-center mt-8">
-        <button className="bg-surface text-gold border border-gold border-dashed py-3 px-8 rounded-sm hover:bg-gold/10 transition-colors uppercase tracking-widest text-sm">
-          + Добавить лид вручную
-        </button>
-      </div>
-
     </main>
   );
 }
