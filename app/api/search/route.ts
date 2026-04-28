@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma'; // Прямой путь: выходим из 3-х папок и идем в lib
+import prisma from '../../../lib/prisma';
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
-    const { keyword, language = 'RU' } = await request.json();
+    const { keyword } = await request.json();
     const SERPER_API_KEY = process.env.SERPER_API_KEY;
     const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const searchResponse = await fetch('https://google.serper.dev/search', {
       method: 'POST',
       headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: keyword, gl: 'ru', hl: 'ru', num: 20 }),
+      body: JSON.stringify({ q: keyword, num: 20 }),
     });
 
     const searchData = await searchResponse.json();
@@ -27,8 +27,9 @@ export async function POST(request: Request) {
         if (existing) continue;
 
         let aiScore = 5;
-        let aiComment = "Авто-анализ";
+        let aiComment = "Сайт найден в сети";
 
+        // Блок ИИ с защитой от вылета
         if (OPENROUTER_API_KEY) {
           try {
             const aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -40,23 +41,30 @@ export async function POST(request: Request) {
               body: JSON.stringify({
                 model: "google/gemini-2.0-flash-001",
                 messages: [
-                  { role: "system", content: "Ты эксперт проекта 'Живое Таро'. Оцени сайт. JSON формат: { \"score\": 1-10, \"comment\": \"почему\" }" },
-                  { role: "user", content: `Заголовок: ${item.title}. Описание: ${item.snippet}` }
+                  { role: "system", content: "Оцени сайт для проекта 'Живое Таро'. Ответ JSON: { \"score\": число, \"comment\": \"текст\" }" },
+                  { role: "user", content: `Сайт: ${item.title}. Описание: ${item.snippet}` }
                 ],
                 response_format: { type: "json_object" }
               })
             });
+
             const aiData = await aiRes.json();
-            const parsed = JSON.parse(aiData.choices[0].message.content);
-            aiScore = parseInt(parsed.score) || 5;
-            aiComment = parsed.comment || "Без комментария";
+            
+            // ИНЖЕНЕРНАЯ ЗАЩИТА: проверяем, что ИИ реально что-то ответил
+            if (aiData?.choices?.[0]?.message?.content) {
+              const parsed = JSON.parse(aiData.choices[0].message.content);
+              aiScore = parseInt(parsed.score) || 5;
+              aiComment = parsed.comment || "Без комментария";
+            }
           } catch (aiErr) {
-            console.error("Ошибка ИИ", aiErr);
+            console.error("ИИ временно недоступен, сохраняем без оценки");
           }
         }
 
+        // Сохранение (теперь до него точно дойдет очередь)
         await prisma.lead.create({
           data: {
+            id: crypto.randomUUID(), // Генерируем ID вручную для надежности
             name: item.title,
             url: item.link,
             description: item.snippet,
@@ -68,13 +76,13 @@ export async function POST(request: Request) {
         });
         savedCount++;
       } catch (e) {
-        console.error("Ошибка записи лида:", e);
+        console.error("Ошибка при записи конкретного лида:", e);
       }
     }
 
     return NextResponse.json({ success: true, count: savedCount });
   } catch (error) {
-    console.error("Критическая ошибка:", error);
-    return NextResponse.json({ error: 'Внутренняя ошибка' }, { status: 500 });
+    console.error("Критическая ошибка сервера:", error);
+    return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
   }
 }
