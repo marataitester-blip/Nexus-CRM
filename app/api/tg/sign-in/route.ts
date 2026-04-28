@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { client } from '../../../lib/telegram-client';
+import { client } from '../../../../lib/telegram-client';
 
 export async function POST(request: Request) {
   try {
