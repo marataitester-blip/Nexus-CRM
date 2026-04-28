@@ -26,10 +26,9 @@ export async function POST(request: Request) {
         const existing = await prisma.lead.findUnique({ where: { url: item.link } });
         if (existing) continue;
 
-        let aiScore = 5;
-        let aiComment = "Сайт найден в сети";
+        let aiScore = 1; // Теперь дефолт — низкий, чтобы видеть реальную работу ИИ
+        let aiComment = "Не прошел первичный фильтр";
 
-        // Блок ИИ с защитой от вылета
         if (OPENROUTER_API_KEY) {
           try {
             const aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -41,30 +40,47 @@ export async function POST(request: Request) {
               body: JSON.stringify({
                 model: "google/gemini-2.0-flash-001",
                 messages: [
-                  { role: "system", content: "Оцени сайт для проекта 'Живое Таро'. Ответ JSON: { \"score\": число, \"comment\": \"текст\" }" },
-                  { role: "user", content: `Сайт: ${item.title}. Описание: ${item.snippet}` }
+                  { 
+                    role: "system", 
+                    content: `Ты — Мессир, строгий философ и аналитик проекта 'Живое Таро'. 
+                    Твоя задача: оценить сайт на пригодность к партнерству.
+                    
+                    КРИТЕРИИ ОЦЕНКИ (0-10):
+                    1. ГЛУБИНА (40%): Это серьезная психология/архетипы или 'попса'? 
+                    2. ЭСТЕТИКА (30%): Насколько описание резонирует с Retro-Futurism, Steampunk или Магическим реализмом?
+                    3. ПОТЕНЦИАЛ (30%): Насколько ценна аудитория этого ресурса для проекта?
+
+                    ШКАЛА:
+                    1-3: Мусор, спам, дешевые гадания.
+                    4-6: Обычные школы таро или психологические блоги.
+                    7-8: Высокое качество, созвучная эстетика, глубокий подход.
+                    9-10: Идеальное совпадение по 'вайбу' и смыслам.
+
+                    ОТВЕТЬ СТРОГО JSON: { "score": число, "reason": "краткий инженерный вывод" }` 
+                  },
+                  { role: "user", content: `АНАЛИЗИРУЙ: Заголовок: ${item.title}. Описание: ${item.snippet}` }
                 ],
                 response_format: { type: "json_object" }
               })
             });
 
             const aiData = await aiRes.json();
+            const content = aiData?.choices?.[0]?.message?.content;
             
-            // ИНЖЕНЕРНАЯ ЗАЩИТА: проверяем, что ИИ реально что-то ответил
-            if (aiData?.choices?.[0]?.message?.content) {
-              const parsed = JSON.parse(aiData.choices[0].message.content);
-              aiScore = parseInt(parsed.score) || 5;
-              aiComment = parsed.comment || "Без комментария";
+            if (content) {
+              const parsed = JSON.parse(content);
+              aiScore = Math.min(10, Math.max(1, parseInt(parsed.score) || 1));
+              aiComment = parsed.reason || "Без резюме";
             }
           } catch (aiErr) {
-            console.error("ИИ временно недоступен, сохраняем без оценки");
+            console.error("Ошибка ИИ:", aiErr);
+            aiComment = "Ошибка анализа ИИ";
           }
         }
 
-        // Сохранение (теперь до него точно дойдет очередь)
         await prisma.lead.create({
           data: {
-            id: crypto.randomUUID(), // Генерируем ID вручную для надежности
+            id: crypto.randomUUID(),
             name: item.title,
             url: item.link,
             description: item.snippet,
@@ -76,13 +92,12 @@ export async function POST(request: Request) {
         });
         savedCount++;
       } catch (e) {
-        console.error("Ошибка при записи конкретного лида:", e);
+        console.error("Ошибка записи:", e);
       }
     }
 
     return NextResponse.json({ success: true, count: savedCount });
   } catch (error) {
-    console.error("Критическая ошибка сервера:", error);
     return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
   }
 }
