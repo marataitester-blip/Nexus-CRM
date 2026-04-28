@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { client } from '@/lib/telegram-client';
+import { client } from '../../../lib/telegram-client';
 
 export async function POST(request: Request) {
   try {
@@ -10,7 +10,6 @@ export async function POST(request: Request) {
     }
 
     // Запрашиваем код у Telegram. 
-    // phoneCodeHash — это временный идентификатор сессии, который понадобится на следующем шаге
     const { phoneCodeHash } = await client.sendCode(
       {
         apiId: parseInt(process.env.TELEGRAM_API_ID || '0'),
