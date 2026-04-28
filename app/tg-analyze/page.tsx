@@ -8,6 +8,9 @@ type Message = {
   content: string | React.ReactNode;
 };
 
+// Функция искусственной задержки
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export default function TelegramAnalyzePage() {
   const [prompt, setPrompt] = useState('');
   const [mode, setMode] = useState<1 | 2 | 3>(1); // 1: Google, 2: TGStat, 3: Spider
@@ -35,7 +38,6 @@ export default function TelegramAnalyzePage() {
     addMessage('system', `Активирован модуль: ${modeNames[mode]}. Выполняю захват целей...`);
 
     try {
-      // 1. Поиск ссылок через выбранный движок
       const searchRes = await fetch('/api/tg/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -56,11 +58,18 @@ export default function TelegramAnalyzePage() {
         return;
       }
 
-      addMessage('system', `Обнаружено целей: ${searchData.links.length}. Начинаю глубокий психо-бизнес анализ...`);
+      // ОГРАНИЧЕНИЕ: Берем строго не больше 3 каналов за раз
+      const targetLinks = searchData.links.slice(0, 3);
 
-      // 2. Поштучный анализ найденных каналов
-      for (const link of searchData.links) {
+      addMessage('system', `Всего найдено целей: ${searchData.links.length}. В целях безопасности беру в работу первые ${targetLinks.length}. Начинаю глубокий анализ...`);
+
+      // Поштучный анализ с искусственной паузой
+      for (let i = 0; i < targetLinks.length; i++) {
+        const link = targetLinks[i];
+        
         try {
+          addMessage('system', `[${i+1}/${targetLinks.length}] Сканирую ${link}...`);
+          
           const analyzeRes = await fetch('/api/tg/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -71,37 +80,40 @@ export default function TelegramAnalyzePage() {
 
           if (analyzeData.error) {
             addMessage('system', `[${link}] Сбой анализатора: ${analyzeData.error}`);
-            continue;
-          }
-
-          // Карточка результата
-          const resultCard = (
-            <div className="border border-zinc-700 bg-black p-4 rounded mt-2 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-              <a href={link} target="_blank" rel="noopener noreferrer" className="text-yellow-500 hover:text-yellow-400 hover:underline font-bold mb-3 inline-block tracking-wider">
-                {link.replace('https://t.me/', '@')}
-              </a>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-zinc-900 border border-zinc-800 p-2 text-center rounded">
-                  <span className="block text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Вердикт Мессира</span>
-                  <span className={`text-2xl font-bold ${analyzeData.aiScore >= 8 ? 'text-green-500' : analyzeData.aiScore >= 5 ? 'text-yellow-500' : 'text-red-500'}`}>
-                    {analyzeData.aiScore} / 10
-                  </span>
+          } else {
+            const resultCard = (
+              <div className="border border-zinc-700 bg-black p-4 rounded mt-2 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+                <a href={link} target="_blank" rel="noopener noreferrer" className="text-yellow-500 hover:text-yellow-400 hover:underline font-bold mb-3 inline-block tracking-wider">
+                  {link.replace('https://t.me/', '@')}
+                </a>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="bg-zinc-900 border border-zinc-800 p-2 text-center rounded">
+                    <span className="block text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Вердикт Мессира</span>
+                    <span className={`text-2xl font-bold ${analyzeData.aiScore >= 8 ? 'text-green-500' : analyzeData.aiScore >= 5 ? 'text-yellow-500' : 'text-red-500'}`}>
+                      {analyzeData.aiScore} / 10
+                    </span>
+                  </div>
+                  <div className="bg-zinc-900 border border-zinc-800 p-2 text-center rounded">
+                    <span className="block text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Вовлеченность (ER)</span>
+                    <span className="text-2xl font-bold text-white">{analyzeData.er}%</span>
+                  </div>
                 </div>
-                <div className="bg-zinc-900 border border-zinc-800 p-2 text-center rounded">
-                  <span className="block text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Вовлеченность (ER)</span>
-                  <span className="text-2xl font-bold text-white">{analyzeData.er}%</span>
-                </div>
+                <p className="text-sm text-zinc-300 border-l-2 border-yellow-700 pl-3 py-1 font-sans leading-relaxed">
+                  {analyzeData.comment}
+                </p>
               </div>
-              <p className="text-sm text-zinc-300 border-l-2 border-yellow-700 pl-3 py-1 font-sans leading-relaxed">
-                {analyzeData.comment}
-              </p>
-            </div>
-          );
-
-          addMessage('result', resultCard);
+            );
+            addMessage('result', resultCard);
+          }
           
         } catch (err) {
-          addMessage('system', `[${link}] Потеря связи с Мессиром во время анализа.`);
+          addMessage('system', `[${link}] Потеря связи с сервером во время анализа.`);
+        }
+
+        // Пауза 6 секунд между запросами (кроме последнего)
+        if (i < targetLinks.length - 1) {
+          addMessage('system', '⏳ Скрываю следы... Ожидание 6 секунд перед следующей целью...');
+          await sleep(6000);
         }
       }
 
@@ -146,7 +158,7 @@ export default function TelegramAnalyzePage() {
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-zinc-600 text-sm text-center space-y-2">
               <p>Ожидаю параметров для запуска алгоритмов.</p>
-              <p className="text-xs text-zinc-700">Все найденные и одобренные каналы будут автоматически сохранены в базу Nexus.</p>
+              <p className="text-xs text-zinc-700">Максимум 3 канала за цикл для защиты от блокировок.</p>
             </div>
           )}
           {messages.map((msg) => (
