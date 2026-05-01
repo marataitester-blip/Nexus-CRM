@@ -133,12 +133,11 @@ export async function POST(request: Request) {
           name: channelUsername,
           url: `https://t.me/${channelUsername}`,
           description: `Подписчиков: ${participantsCount}, Просмотров: ${avgViews}`,
-          platform: 'TELEGRAM',
-          language: 'RU',
           aiScore: aiScore,
           aiComment: aiComment
         }
       });
+      console.log(`[NEXUS-CRM] Лид ${channelUsername} успешно сохранен в базу!`);
     } catch (dbErr) {
       console.error("Ошибка сохранения в БД:", dbErr);
     }
