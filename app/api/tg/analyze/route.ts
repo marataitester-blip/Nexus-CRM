@@ -16,6 +16,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Неверный формат ссылки' }, { status: 400 });
     }
 
+    // --- НАЧАЛО: КАРАНТИН 10 ДНЕЙ ---
+    const tenDaysAgo = new Date();
+    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+
+    try {
+      const existingLead = await prisma.lead.findUnique({
+        where: { url: `https://t.me/${channelUsername}` }
+      });
+
+      // Если лид есть и был добавлен менее 10 дней назад -> бережем токены
+      if (existingLead && existingLead.createdAt > tenDaysAgo) {
+        console.log(`[КАРАНТИН] Канал ${channelUsername} проверялся менее 10 дней назад. Пропускаем анализ.`);
+        return NextResponse.json({ 
+          success: true, 
+          aiScore: existingLead.aiScore, 
+          er: "Из памяти", 
+          comment: "[КАРАНТИН 10 ДНЕЙ] " + existingLead.aiComment 
+        });
+      }
+    } catch (dbError) {
+      console.error("Ошибка при проверке карантина БД:", dbError);
+    }
+    // --- КОНЕЦ: КАРАНТИН 10 ДНЕЙ ---
+
     const apiId = parseInt(process.env.TELEGRAM_API_ID || '0');
     const apiHash = process.env.TELEGRAM_API_HASH || '';
     const sessionString = process.env.TELEGRAM_SESSION || '';
