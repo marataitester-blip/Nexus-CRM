@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         .map((item: any) => item.link)
         .filter((link: string) => link.includes('t.me/') && !link.includes('joinchat') && !link.includes('+') && link.split('/').length === 4)
         .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index)
-        .slice(0, 5);
+        .slice(0, 6);
 
       return NextResponse.json({ links });
     }
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       const TGSTAT_API_KEY = process.env.TGSTAT_API_KEY;
       if (!TGSTAT_API_KEY) throw new Error('Для этого режима нужен TGSTAT_API_KEY в Vercel. Зарегистрируйтесь на api.tgstat.ru');
 
-      const res = await fetch(`https://api.tgstat.ru/channels/search?token=${TGSTAT_API_KEY}&q=${encodeURIComponent(prompt)}&limit=5`);
+      const res = await fetch(`https://api.tgstat.ru/channels/search?token=${TGSTAT_API_KEY}&q=${encodeURIComponent(prompt)}&limit=6`);
       const data = await res.json();
 
       if (data.status !== 'ok' || !data.response.items) return NextResponse.json({ links: [] });
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
         }
       }
 
-      const links = Array.from(foundLinks).slice(0, 5);
+      const links = Array.from(foundLinks).slice(0, 6);
       return NextResponse.json({ links });
     }
 
