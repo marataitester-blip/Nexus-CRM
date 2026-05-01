@@ -40,8 +40,8 @@ export async function POST(request: Request) {
       console.warn("Не удалось получить точное количество подписчиков. Канал может быть закрытым.");
     }
 
-    // Собираем последние 15 постов
-    const messages = await client.getMessages(channelUsername, { limit: 15 });
+    // Собираем последние 100 постов
+    const messages = await client.getMessages(channelUsername, { limit: 100 });
     
     let totalViews = 0;
     let postsWithViews = 0;
