@@ -52,14 +52,15 @@ export default function TelegramAnalyzePage() {
         return;
       }
 
+      // ИСПРАВЛЕНИЕ 1: Теперь терминал выводит причину от бэкенда (например, про карантин)
       if (!searchData.links || searchData.links.length === 0) {
-        addMessage('system', 'Цели не обнаружены. Попробуйте изменить параметры запроса.');
+        addMessage('system', searchData.message || 'Цели не обнаружены. Попробуйте изменить параметры запроса.');
         setLoading(false);
         return;
       }
 
-      // ОГРАНИЧЕНИЕ: Берем строго не больше 3 каналов за раз
-      const targetLinks = searchData.links.slice(0, 3);
+      // ИСПРАВЛЕНИЕ 2: Берем до 6 каналов за раз, как и договаривались
+      const targetLinks = searchData.links.slice(0, 6);
 
       addMessage('system', `Всего найдено целей: ${searchData.links.length}. В целях безопасности беру в работу первые ${targetLinks.length}. Начинаю глубокий анализ...`);
 
@@ -158,7 +159,7 @@ export default function TelegramAnalyzePage() {
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-zinc-600 text-sm text-center space-y-2">
               <p>Ожидаю параметров для запуска алгоритмов.</p>
-              <p className="text-xs text-zinc-700">Максимум 3 канала за цикл для защиты от блокировок.</p>
+              <p className="text-xs text-zinc-700">Максимум 6 каналов за цикл для защиты от блокировок.</p>
             </div>
           )}
           {messages.map((msg) => (
