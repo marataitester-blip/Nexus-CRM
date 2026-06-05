@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       const res = await fetch('https://google.serper.dev/search', {
         method: 'POST',
         headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: searchQuery, gl: 'ru', hl: 'ru', num: 15 })
+        body: JSON.stringify({ q: searchQuery, gl: 'ru', hl: 'ru', num: 40 })
       });
       const data = await res.json();
 
@@ -37,12 +37,15 @@ export async function POST(request: Request) {
       const TGSTAT_API_KEY = process.env.TGSTAT_API_KEY;
       if (!TGSTAT_API_KEY) throw new Error('Для этого режима нужен TGSTAT_API_KEY в Vercel. Зарегистрируйтесь на api.tgstat.ru');
 
-      const res = await fetch(`https://api.tgstat.ru/channels/search?token=${TGSTAT_API_KEY}&q=${encodeURIComponent(prompt)}&limit=6`);
+      const res = await fetch(`https://api.tgstat.ru/channels/search?token=${TGSTAT_API_KEY}&q=${encodeURIComponent(prompt)}&limit=10`);
       const data = await res.json();
 
       if (data.status !== 'ok' || !data.response.items) return NextResponse.json({ links: [] });
 
-      const links = data.response.items.map((channel: any) => channel.link);
+      const links = data.response.items
+        .map((channel: any) => channel.link)
+        .slice(0, 6);
+        
       return NextResponse.json({ links });
     }
 
@@ -60,8 +63,8 @@ export async function POST(request: Request) {
       const client = new TelegramClient(new StringSession(sessionString), apiId, apiHash, { connectionRetries: 5 });
       await client.connect();
 
-      // Берем последние 50 сообщений канала-донора
-      const messages = await client.getMessages(sourceChannel, { limit: 50 });
+      // Берем последние 100 сообщений канала-донора
+      const messages = await client.getMessages(sourceChannel, { limit: 100 });
       
       const foundLinks = new Set<string>();
 
