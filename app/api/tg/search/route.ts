@@ -13,7 +13,10 @@ export async function POST(request: Request) {
       const SERPER_API_KEY = process.env.SERPER_API_KEY;
       if (!SERPER_API_KEY) throw new Error('В Vercel не настроен SERPER_API_KEY');
 
-      const searchQuery = `site:t.me ${prompt}`;
+      // ИСПРАВЛЕНИЕ: Убрали оператор site:, из-за которого блокировал бесплатный тариф.
+      // Теперь Гугл видит это как обычный человеческий запрос.
+      const searchQuery = `${prompt} t.me`;
+      
       const res = await fetch('https://google.serper.dev/search', {
         method: 'POST',
         headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
@@ -21,7 +24,6 @@ export async function POST(request: Request) {
       });
       const data = await res.json();
 
-      // ДИАГНОСТИКА: Если ссылок нет, выкидываем сырой ответ Гугла прямо на экран
       if (!data.organic) {
         throw new Error(`Сбой Google Serper. Ответ сервера: ${JSON.stringify(data)}`);
       }
@@ -45,7 +47,6 @@ export async function POST(request: Request) {
       const res = await fetch(tgstatUrl);
       const data = await res.json();
 
-      // ДИАГНОСТИКА: Выкидываем сырой ответ TGStat на экран
       if (data.status !== 'ok' || !data.response.items) {
         throw new Error(`Сбой TGStat. Ответ сервера: ${JSON.stringify(data)}`);
       }
