@@ -9,8 +9,11 @@ export async function POST(request: Request) {
   try {
     const { channelUrl } = await request.json();
     
-    // ИСПРАВЛЕНИЕ: Научили скрипт правильно читать веб-ссылки Гугла (с t.me/s/)
-    const channelUsername = channelUrl.replace(/(https?:\/\/)?(t\.me\/s\/|t\.me\/|@)/g, '').split('/')[0];
+    // ИСПРАВЛЕНИЕ: Теперь скрипт срезает не только веб-префиксы, но и хвосты запросов (?before=...)
+    const channelUsername = channelUrl
+      .replace(/(https?:\/\/)?(t\.me\/s\/|t\.me\/|@)/g, '')
+      .split('/')[0]
+      .split('?')[0];
 
     if (!channelUsername) {
       return NextResponse.json({ error: 'Неверный формат ссылки' }, { status: 400 });
