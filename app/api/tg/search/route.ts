@@ -11,9 +11,8 @@ export async function POST(request: Request) {
     // === РЕЖИМ 1: GOOGLE-ШПИОН ===
     if (mode === 1) {
       const SERPER_API_KEY = process.env.SERPER_API_KEY;
-      if (!SERPER_API_KEY) throw new Error('Не настроен SERPER_API_KEY');
+      if (!SERPER_API_KEY) throw new Error('В Vercel не настроен SERPER_API_KEY');
 
-      // Убрали все минус-слова (-чат -бот), ищем максимально широко
       const searchQuery = `site:t.me ${prompt}`;
       const res = await fetch('https://google.serper.dev/search', {
         method: 'POST',
@@ -22,11 +21,13 @@ export async function POST(request: Request) {
       });
       const data = await res.json();
 
-      if (!data.organic) return NextResponse.json({ links: [] });
+      // ДИАГНОСТИКА: Если ссылок нет, выкидываем сырой ответ Гугла прямо на экран
+      if (!data.organic) {
+        throw new Error(`Сбой Google Serper. Ответ сервера: ${JSON.stringify(data)}`);
+      }
 
       const links = data.organic
         .map((item: any) => item.link)
-        // СНЯТЫ ВСЕ ФИЛЬТРЫ: пропускаем любую ссылку, где есть t.me/
         .filter((link: string) => link.includes('t.me/'))
         .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index)
         .slice(0, 6);
@@ -37,15 +38,17 @@ export async function POST(request: Request) {
     // === РЕЖИМ 2: ПРО-БАЗЫ (TGStat) ===
     if (mode === 2) {
       const TGSTAT_API_KEY = process.env.TGSTAT_API_KEY;
-      if (!TGSTAT_API_KEY) throw new Error('Для этого режима нужен TGSTAT_API_KEY в Vercel. Зарегистрируйтесь на api.tgstat.ru');
+      if (!TGSTAT_API_KEY) throw new Error('В Vercel не настроен TGSTAT_API_KEY');
 
-      // ЖЕСТКИЙ ФИЛЬТР: Строго от 10 000 до 150 000 подписчиков
       const tgstatUrl = `https://api.tgstat.ru/channels/search?token=${TGSTAT_API_KEY}&q=${encodeURIComponent(prompt)}&limit=20&subscribers_count_from=10000&subscribers_count_to=150000`;
       
       const res = await fetch(tgstatUrl);
       const data = await res.json();
 
-      if (data.status !== 'ok' || !data.response.items) return NextResponse.json({ links: [] });
+      // ДИАГНОСТИКА: Выкидываем сырой ответ TGStat на экран
+      if (data.status !== 'ok' || !data.response.items) {
+        throw new Error(`Сбой TGStat. Ответ сервера: ${JSON.stringify(data)}`);
+      }
 
       const links = data.response.items
         .map((channel: any) => channel.link)
@@ -62,25 +65,21 @@ export async function POST(request: Request) {
 
       if (!sessionString) throw new Error('Нет сессии Telegram. Авторизуйтесь через /tg-auth');
 
-      // Очищаем ссылку источника
       const sourceChannel = prompt.replace(/(https?:\/\/)?(t\.me\/|@)/g, '').split('/')[0];
 
       const client = new TelegramClient(new StringSession(sessionString), apiId, apiHash, { connectionRetries: 5 });
       await client.connect();
 
-      // Берем последние 100 сообщений канала-донора
       const messages = await client.getMessages(sourceChannel, { limit: 100 });
       
       const foundLinks = new Set<string>();
 
       for (const msg of messages) {
-        // Ищем прямые ссылки t.me/ в текстах постов
         if (msg.message) {
           const regex = /t\.me\/([a-zA-Z0-9_]+)/g;
           let match;
           while ((match = regex.exec(msg.message)) !== null) {
             const mentionedChannel = match[1];
-            // СНЯТЫ ВСЕ ФИЛЬТРЫ: Исключаем только сам канал-донор
             if (mentionedChannel.toLowerCase() !== sourceChannel.toLowerCase()) {
               foundLinks.add(`https://t.me/${mentionedChannel}`);
             }
