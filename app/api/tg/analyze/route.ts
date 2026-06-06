@@ -51,12 +51,12 @@ export async function POST(request: Request) {
     const avgViews = postsWithViews > 0 ? Math.round(totalViews / postsWithViews) : 0;
     const er = participantsCount > 0 ? ((avgViews / participantsCount) * 100).toFixed(2) : "0.00";
 
-    // Анализ Мессира
+    // Анализ Мессира (ПЕРЕКЛЮЧЕНО НА DEEPSEEK)
     const aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-001",
+        model: "deepseek/deepseek-chat", // Используем флагманский DeepSeek V3 через OpenRouter
         messages: [
           { 
             role: "system", 
@@ -79,14 +79,25 @@ export async function POST(request: Request) {
     });
 
     const aiData = await aiRes.json();
+    
+    // Добавлена минимальная защита от ошибок OpenRouter
+    if (aiData.error) {
+       throw new Error(`Ошибка OpenRouter: ${aiData.error.message}`);
+    }
+
     const content = aiData?.choices?.[0]?.message?.content;
-    let aiScore = 1, aiComment = "Ошибка";
+    let aiScore = 1, aiComment = "Ошибка анализа";
 
     if (content) {
-      const parsed = JSON.parse(content);
-      aiScore = Math.min(10, Math.max(1, parseInt(parsed.score) || 1));
-      // Добавляем тег диапазона в начало комментария
-      aiComment = `${rangeTag} [ER: ${er}%] ` + (parsed.reason || "Без резюме");
+      try {
+        const parsed = JSON.parse(content);
+        aiScore = Math.min(10, Math.max(1, parseInt(parsed.score) || 1));
+        // Добавляем тег диапазона в начало комментария
+        aiComment = `${rangeTag} [ER: ${er}%] ` + (parsed.reason || "Без резюме");
+      } catch (parseError) {
+         console.error("Ошибка парсинга JSON от нейросети:", content);
+         aiComment = "Модель вернула некорректный ответ.";
+      }
     }
 
     await prisma.lead.upsert({
