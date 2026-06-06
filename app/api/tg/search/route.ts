@@ -13,11 +13,12 @@ export async function POST(request: Request) {
       const SERPER_API_KEY = process.env.SERPER_API_KEY;
       if (!SERPER_API_KEY) throw new Error('Не настроен SERPER_API_KEY');
 
-      const searchQuery = `site:t.me ${prompt} -чат -chat -бот -bot`;
+      // Убрали все минус-слова (-чат -бот), ищем максимально широко
+      const searchQuery = `site:t.me ${prompt}`;
       const res = await fetch('https://google.serper.dev/search', {
         method: 'POST',
         headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: searchQuery, gl: 'ru', hl: 'ru', num: 40 })
+        body: JSON.stringify({ q: searchQuery, gl: 'ru', hl: 'ru', num: 15 })
       });
       const data = await res.json();
 
@@ -25,7 +26,8 @@ export async function POST(request: Request) {
 
       const links = data.organic
         .map((item: any) => item.link)
-        .filter((link: string) => link.includes('t.me/') && !link.includes('joinchat') && !link.includes('+') && link.split('/').length === 4)
+        // СНЯТЫ ВСЕ ФИЛЬТРЫ: пропускаем любую ссылку, где есть t.me/
+        .filter((link: string) => link.includes('t.me/'))
         .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index)
         .slice(0, 6);
 
@@ -37,7 +39,10 @@ export async function POST(request: Request) {
       const TGSTAT_API_KEY = process.env.TGSTAT_API_KEY;
       if (!TGSTAT_API_KEY) throw new Error('Для этого режима нужен TGSTAT_API_KEY в Vercel. Зарегистрируйтесь на api.tgstat.ru');
 
-      const res = await fetch(`https://api.tgstat.ru/channels/search?token=${TGSTAT_API_KEY}&q=${encodeURIComponent(prompt)}&limit=10`);
+      // ЖЕСТКИЙ ФИЛЬТР: Строго от 10 000 до 150 000 подписчиков
+      const tgstatUrl = `https://api.tgstat.ru/channels/search?token=${TGSTAT_API_KEY}&q=${encodeURIComponent(prompt)}&limit=20&subscribers_count_from=10000&subscribers_count_to=150000`;
+      
+      const res = await fetch(tgstatUrl);
       const data = await res.json();
 
       if (data.status !== 'ok' || !data.response.items) return NextResponse.json({ links: [] });
@@ -75,10 +80,8 @@ export async function POST(request: Request) {
           let match;
           while ((match = regex.exec(msg.message)) !== null) {
             const mentionedChannel = match[1];
-            // Исключаем сам канал-донор 
-            if (mentionedChannel.toLowerCase() !== sourceChannel.toLowerCase() && 
-                !mentionedChannel.toLowerCase().includes('bot') &&
-                !mentionedChannel.toLowerCase().includes('chat')) {
+            // СНЯТЫ ВСЕ ФИЛЬТРЫ: Исключаем только сам канал-донор
+            if (mentionedChannel.toLowerCase() !== sourceChannel.toLowerCase()) {
               foundLinks.add(`https://t.me/${mentionedChannel}`);
             }
           }
