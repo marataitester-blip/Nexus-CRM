@@ -8,7 +8,9 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   try {
     const { channelUrl } = await request.json();
-    const channelUsername = channelUrl.replace(/(https?:\/\/)?(t\.me\/|@)/g, '').split('/')[0];
+    
+    // ИСПРАВЛЕНИЕ: Научили скрипт правильно читать веб-ссылки Гугла (с t.me/s/)
+    const channelUsername = channelUrl.replace(/(https?:\/\/)?(t\.me\/s\/|t\.me\/|@)/g, '').split('/')[0];
 
     if (!channelUsername) {
       return NextResponse.json({ error: 'Неверный формат ссылки' }, { status: 400 });
@@ -51,12 +53,12 @@ export async function POST(request: Request) {
     const avgViews = postsWithViews > 0 ? Math.round(totalViews / postsWithViews) : 0;
     const er = participantsCount > 0 ? ((avgViews / participantsCount) * 100).toFixed(2) : "0.00";
 
-    // Анализ Мессира (ПЕРЕКЛЮЧЕНО НА DEEPSEEK)
+    // Анализ Мессира (DeepSeek)
     const aiRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "deepseek/deepseek-chat", // Используем флагманский DeepSeek V3 через OpenRouter
+        model: "deepseek/deepseek-chat",
         messages: [
           { 
             role: "system", 
@@ -80,7 +82,6 @@ export async function POST(request: Request) {
 
     const aiData = await aiRes.json();
     
-    // Добавлена минимальная защита от ошибок OpenRouter
     if (aiData.error) {
        throw new Error(`Ошибка OpenRouter: ${aiData.error.message}`);
     }
@@ -92,7 +93,6 @@ export async function POST(request: Request) {
       try {
         const parsed = JSON.parse(content);
         aiScore = Math.min(10, Math.max(1, parseInt(parsed.score) || 1));
-        // Добавляем тег диапазона в начало комментария
         aiComment = `${rangeTag} [ER: ${er}%] ` + (parsed.reason || "Без резюме");
       } catch (parseError) {
          console.error("Ошибка парсинга JSON от нейросети:", content);
