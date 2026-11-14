@@ -52,27 +52,29 @@ export default function TelegramAnalyzePage() {
 
       // ИСПРАВЛЕНИЕ 1: Теперь терминал выводит причину от бэкенда (например, про карантин)
       if (!searchData.links || searchData.links.length === 0) {
-        addMessage('system', searchData.message || 'Цели не обнаружены. Попробуйте изменить параметры запроса.');
+        addMessage('system', searchData.message || 'Нет подтверждённых каналов с 1000+ подписчиков. Попробуйте изменить тему поиска.');
         setLoading(false);
         return;
       }
 
-      addMessage('system', `Найдено адресов: ${searchData.links.length}. Сохранено в базе: ${searchData.savedCount ?? 'неизвестно'}. Анализ ИИ отключён: дополнительные запросы не выполняются.`);
+      addMessage('system', `Проверено: ${searchData.links.length} публичных каналов с 1000+ подписчиков. Сохранено в базе: ${searchData.savedCount ?? 'неизвестно'}. Анализ ИИ отключён: дополнительные запросы не выполняются.`);
       if (searchData.saveErrors?.length) {
         addMessage('system', `Не удалось сохранить ${searchData.saveErrors.length} адресов. Проверь подключение базы данных.`);
       }
       addMessage('result', (
         <div className="space-y-2">
           <p className="text-yellow-600 font-bold">НАЙДЕННЫЕ АДРЕСА</p>
-          {searchData.links.map((link: string) => (
-            <div key={link}>
-              <a href={link} target="_blank" rel="noopener noreferrer"
-                 className="text-yellow-500 underline break-all">{link}</a>
+          {(searchData.channels || []).map((channel: { url: string; title: string; subscribers: number }) => (
+            <div key={channel.url} className="border-b border-zinc-800 py-2">
+              <div className="text-white">{channel.title}</div>
+              <div className="text-sm text-zinc-400">Подписчиков: {channel.subscribers.toLocaleString('ru-RU')}</div>
+              <a href={channel.url} target="_blank" rel="noopener noreferrer"
+                 className="text-yellow-500 underline break-all">{channel.url}</a>
             </div>
           ))}
         </div>
       ));
-      addMessage('system', 'Поиск завершён. Проверьте найденные каналы вручную перед запуском рекламы.');
+      addMessage('system', 'Поиск завершён. Язык аудитории и её страна требуют отдельной проверки перед рекламой.');
 
     } catch (error: any) {
       addMessage('system', 'Критический сбой терминала.');
