@@ -1,8 +1,38 @@
 import { NextResponse } from 'next/server';
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions';
+import prisma from '../../../../lib/prisma';
 
 export const maxDuration = 60;
+
+ // Сохранение адресов выполняется сразу после поиска, независимо от анализа.
+async function saveFoundChannels(links: string[]) {
+  const unique = new Map<string, string>();
+  for (const link of links) {
+    const match = link.match(/^https?:\/\/(?:www\.)?t\.me\/(?:s\/)?([a-zA-Z][a-zA-Z0-9_]{4,31})(?:[/?#]|$)/i);
+    if (!match) continue;
+    const username = match[1];
+    unique.set(username.toLowerCase(), username);
+  }
+  let savedCount = 0;
+  const saveErrors: string[] = [];
+  for (const username of unique.values()) {
+    const url = 'https://t.me/' + username;
+    try {
+      await prisma.lead.upsert({
+        where: { url },
+        update: { platform: 'TELEGRAM' },
+        create: { name: username, url, platform: 'TELEGRAM' },
+      });
+      savedCount++;
+    } catch (error) {
+      console.error('Ошибка сохранения Telegram-адреса:', url, error);
+      saveErrors.push(url);
+    }
+  }
+  return { savedCount, saveErrors };
+}
+
 
 export async function POST(request: Request) {
   try {
@@ -34,7 +64,7 @@ export async function POST(request: Request) {
         .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index)
         .slice(0, 6);
 
-      return NextResponse.json({ links });
+      return NextResponse.json({ links, ...(await saveFoundChannels(links)) });
     }
 
     // === РЕЖИМ 2: ПРО-БАЗЫ (TGStat) ===
@@ -55,7 +85,7 @@ export async function POST(request: Request) {
         .map((channel: any) => channel.link)
         .slice(0, 6);
         
-      return NextResponse.json({ links });
+      return NextResponse.json({ links, ...(await saveFoundChannels(links)) });
     }
 
     // === РЕЖИМ 3: ПАУТИНА (Органический поиск по репостам) ===
@@ -89,7 +119,7 @@ export async function POST(request: Request) {
       }
 
       const links = Array.from(foundLinks).slice(0, 6);
-      return NextResponse.json({ links });
+      return NextResponse.json({ links, ...(await saveFoundChannels(links)) });
     }
 
     return NextResponse.json({ error: 'Неизвестный режим' }, { status: 400 });
