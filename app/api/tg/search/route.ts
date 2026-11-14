@@ -5,6 +5,20 @@ import prisma from '../../../../lib/prisma';
 
 export const maxDuration = 60;
 
+// Search locale controls query phrasing and Google region, not a strict
+// classification of the channel's actual content.
+const SEARCH_LOCALES = {
+  ru: { gl: 'ru', hl: 'ru', hint: 'телеграм каналы' },
+  'es-ES': { gl: 'es', hl: 'es', hint: 'canales de Telegram España' },
+  'es-MX': { gl: 'mx', hl: 'es', hint: 'canales de Telegram México' },
+  en: { gl: 'us', hl: 'en', hint: 'Telegram channels' },
+  de: { gl: 'de', hl: 'de', hint: 'Telegram Kanäle' },
+  fr: { gl: 'fr', hl: 'fr', hint: 'chaînes Telegram' },
+  it: { gl: 'it', hl: 'it', hint: 'canali Telegram' },
+  pt: { gl: 'br', hl: 'pt', hint: 'canais Telegram' },
+} as const;
+type SearchLocale = keyof typeof SEARCH_LOCALES;
+
  // Сохранение адресов выполняется сразу после поиска, независимо от анализа.
 async function saveFoundChannels(links: string[]) {
   const unique = new Map<string, string>();
@@ -36,7 +50,12 @@ async function saveFoundChannels(links: string[]) {
 
 export async function POST(request: Request) {
   try {
-    const { prompt, mode } = await request.json();
+    const { prompt, mode, language = 'ru' } = await request.json();
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 250)
+      return NextResponse.json({ error: 'Введите тему поиска (до 250 символов)' }, { status: 400 });
+    if (!Object.prototype.hasOwnProperty.call(SEARCH_LOCALES, language))
+      return NextResponse.json({ error: 'Неизвестный язык поиска' }, { status: 400 });
+    const locale = SEARCH_LOCALES[language as SearchLocale];
 
     // === РЕЖИМ 1: GOOGLE-ШПИОН ===
     if (mode === 1) {
@@ -45,12 +64,12 @@ export async function POST(request: Request) {
 
       // ИСПРАВЛЕНИЕ: Убрали оператор site:, из-за которого блокировал бесплатный тариф.
       // Теперь Гугл видит это как обычный человеческий запрос.
-      const searchQuery = `${prompt} t.me`;
+      const searchQuery = `${prompt.trim()} ${locale.hint} t.me`;
       
       const res = await fetch('https://google.serper.dev/search', {
         method: 'POST',
         headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: searchQuery, gl: 'ru', hl: 'ru', num: 15 })
+        body: JSON.stringify({ q: searchQuery, gl: locale.gl, hl: locale.hl, num: 30 })
       });
       const data = await res.json();
 
@@ -64,7 +83,7 @@ export async function POST(request: Request) {
         .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index)
         .slice(0, 6);
 
-      return NextResponse.json({ links, ...(await saveFoundChannels(links)) });
+      return NextResponse.json({ links, language, ...(await saveFoundChannels(links)) });
     }
 
     // === РЕЖИМ 2: ПРО-БАЗЫ (TGStat) ===
