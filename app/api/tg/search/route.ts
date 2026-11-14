@@ -16,7 +16,7 @@ async function saveFoundChannels(links: string[]) {
   }
   let savedCount = 0;
   const saveErrors: string[] = [];
-  for (const username of unique.values()) {
+  for (const username of Array.from(unique.values())) {
     const url = 'https://t.me/' + username;
     try {
       await prisma.lead.upsert({
