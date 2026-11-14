@@ -14,6 +14,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export default function TelegramAnalyzePage() {
   const [prompt, setPrompt] = useState('');
   const [mode, setMode] = useState<1 | 2 | 3>(1); // 1: Google, 2: TGStat, 3: Spider
+  const [language, setLanguage] = useState('ru');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -35,13 +36,13 @@ export default function TelegramAnalyzePage() {
     setLoading(true);
 
     const modeNames = { 1: 'Google-Шпион', 2: 'Про-Базы', 3: 'Паутина' };
-    addMessage('system', `Активирован модуль: ${modeNames[mode]}. Выполняю захват целей...`);
+    addMessage('system', `Активирован модуль: ${modeNames[mode]}. ${mode === 1 ? 'Локаль поиска: ' + language + '. ' : ''}Выполняю захват целей...`);
 
     try {
       const searchRes = await fetch('/api/tg/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: userText, mode }),
+        body: JSON.stringify({ prompt: userText, mode, language }),
       });
       
       const searchData = await searchRes.json();
@@ -147,7 +148,7 @@ export default function TelegramAnalyzePage() {
   };
 
   const getPlaceholder = () => {
-    if (mode === 1) return 'Например: "Бизнес таро" или "Глубинная психология"';
+    if (mode === 1) return language.startsWith('es') ? 'Например: tarot, psicología, crecimiento personal' : 'Например: Бизнес таро или Глубинная психология';
     if (mode === 2) return 'Например: "Архетипы" (Нужен ключ TGStat)';
     if (mode === 3) return 'Введите ссылку на канал-донор (например: t.me/anaktarna)';
     return '';
@@ -160,6 +161,24 @@ export default function TelegramAnalyzePage() {
         {/* Шапка */}
         <div className="bg-zinc-950 border-b border-yellow-900 p-4">
           <h1 className="text-xl uppercase tracking-widest font-bold text-yellow-600 mb-4 text-center">Терминал Мессира: Захват Лидов</h1>
+          {mode === 1 && (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <label htmlFor="search-language" className="text-xs text-zinc-400">Язык и рынок поиска</label>
+              <select id="search-language" value={language} onChange={(e) => setLanguage(e.target.value)}
+                disabled={loading}
+                className="flex-1 min-w-[170px] bg-black border border-yellow-900 p-2 text-yellow-400 rounded">
+                <option value="ru">Русский · Россия</option>
+                <option value="es-ES">Español · Испания</option>
+                <option value="es-MX">Español · Мексика</option>
+                <option value="en">English</option>
+                <option value="de">Deutsch</option>
+                <option value="fr">Français</option>
+                <option value="it">Italiano</option>
+                <option value="pt">Português · Бразилия</option>
+              </select>
+              <p className="w-full text-[11px] text-zinc-600">Уточняет поиск Google, но не гарантирует язык и страну аудитории канала.</p>
+            </div>
+          )}
           <div className="flex gap-2">
             {[1, 2, 3].map((m) => (
               <button 
