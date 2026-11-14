@@ -64,7 +64,7 @@ async function verifyChannels(candidates: string[]): Promise<VerifiedChannel[]> 
         const entity = await client.getEntity(url.replace('https://t.me/', ''));
         if (!(entity instanceof Api.Channel) || !entity.broadcast) continue;
         const info = await client.invoke(new Api.channels.GetFullChannel({ channel: entity }));
-        const subscribers = Number(info.fullChat?.participantsCount || entity.participantsCount || 0);
+        const subscribers = Number((info.fullChat instanceof Api.ChannelFull ? info.fullChat.participantsCount : 0) || entity.participantsCount || 0);
         if (!Number.isFinite(subscribers) || subscribers < 1000) continue;
         verified.push({ url, title: entity.title || url, subscribers });
         if (verified.length >= 6) break;
