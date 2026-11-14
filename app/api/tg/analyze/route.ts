@@ -15,8 +15,8 @@ export async function POST(request: Request) {
       .split('/')[0]
       .split('?')[0];
 
-    if (!channelUsername) {
-      return NextResponse.json({ error: 'Неверный формат ссылки' }, { status: 400 });
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{4,31}$/.test(channelUsername) || ['joinchat','share','addstickers'].includes(channelUsername.toLowerCase())) {
+      return NextResponse.json({ error: 'Нужен публичный канал с адресом @username, а не ссылка-приглашение' }, { status: 400 });
     }
 
     const apiId = parseInt(process.env.TELEGRAM_API_ID || '0');
@@ -24,7 +24,15 @@ export async function POST(request: Request) {
     const sessionString = process.env.TELEGRAM_SESSION || '';
     const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-    if (!sessionString || !OPENROUTER_API_KEY) return NextResponse.json({ error: 'Ошибка конфигурации' }, { status: 500 });
+    if (!apiId || !apiHash || !sessionString || !OPENROUTER_API_KEY) {
+      const missing = [
+        !apiId && 'TELEGRAM_API_ID',
+        !apiHash && 'TELEGRAM_API_HASH',
+        !sessionString && 'TELEGRAM_SESSION',
+        !OPENROUTER_API_KEY && 'OPENROUTER_API_KEY',
+      ].filter(Boolean);
+      return NextResponse.json({ error: 'Не настроены серверные параметры анализатора: ' + missing.join(', '), code: 'ANALYZER_CONFIG_MISSING' }, { status: 503 });
+    }
 
     const client = new TelegramClient(new StringSession(sessionString), apiId, apiHash, { connectionRetries: 5 });
     await client.connect();
