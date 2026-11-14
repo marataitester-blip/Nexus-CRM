@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { TelegramClient } from 'telegram';
+import { Api, TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions';
 import prisma from '../../../../lib/prisma';
 
@@ -41,7 +41,41 @@ function cleanPublicLinks(values: unknown[]): string[] {
     const link = publicChannelLink(value);
     if (link) unique.set(link.toLowerCase(), link);
   }
-  return Array.from(unique.values()).slice(0, 6);
+  return Array.from(unique.values()).slice(0, 15);
+}
+
+type VerifiedChannel = { url: string; title: string; subscribers: number };
+
+// Verify genuine broadcast channels through Telegram. A username alone may
+// belong to a group, user or an unrelated channel with fewer than 1000 members.
+async function verifyChannels(candidates: string[]): Promise<VerifiedChannel[]> {
+  const apiId = Number(process.env.TELEGRAM_API_ID);
+  const apiHash = process.env.TELEGRAM_API_HASH || '';
+  const session = process.env.TELEGRAM_SESSION || '';
+  if (!apiId || !apiHash || !session) {
+    throw new Error('Для проверки каналов нужны TELEGRAM_API_ID, TELEGRAM_API_HASH и TELEGRAM_SESSION');
+  }
+  const client = new TelegramClient(new StringSession(session), apiId, apiHash, { connectionRetries: 2 });
+  const verified: VerifiedChannel[] = [];
+  try {
+    await client.connect();
+    for (const url of candidates.slice(0, 15)) {
+      try {
+        const entity = await client.getEntity(url.replace('https://t.me/', ''));
+        if (!(entity instanceof Api.Channel) || !entity.broadcast) continue;
+        const info = await client.invoke(new Api.channels.GetFullChannel({ channel: entity }));
+        const subscribers = Number(info.fullChat?.participantsCount || entity.participantsCount || 0);
+        if (!Number.isFinite(subscribers) || subscribers < 1000) continue;
+        verified.push({ url, title: entity.title || url, subscribers });
+        if (verified.length >= 6) break;
+      } catch (error) {
+        console.warn('Не удалось проверить Telegram-канал:', url, error instanceof Error ? error.message : String(error));
+      }
+    }
+  } finally {
+    await client.disconnect();
+  }
+  return verified;
 }
 
 // Сохраняем только адреса публичных каналов, без invite-ссылок.
@@ -102,9 +136,9 @@ export async function POST(request: Request) {
         throw new Error(`Сбой Google Serper. Ответ сервера: ${JSON.stringify(data)}`);
       }
 
-      const links = cleanPublicLinks(data.organic.map((item: any) => item.link));
-
-      return NextResponse.json({ links, language, ...(await saveFoundChannels(links)) });
+      const channels = await verifyChannels(cleanPublicLinks(data.organic.map((item: any) => item.link)));
+      const links = channels.map(channel => channel.url);
+      return NextResponse.json({ links, channels, language, minSubscribers: 1000, ...(await saveFoundChannels(links)) });
     }
 
     // === РЕЖИМ 2: ПРО-БАЗЫ (TGStat) ===
@@ -121,9 +155,9 @@ export async function POST(request: Request) {
         throw new Error(`Сбой TGStat. Ответ сервера: ${JSON.stringify(data)}`);
       }
 
-      const links = cleanPublicLinks(data.response.items.map((channel: any) => channel.link));
-        
-      return NextResponse.json({ links, ...(await saveFoundChannels(links)) });
+      const channels = await verifyChannels(cleanPublicLinks(data.response.items.map((channel: any) => channel.link)));
+      const links = channels.map(channel => channel.url);
+      return NextResponse.json({ links, channels, minSubscribers: 1000, ...(await saveFoundChannels(links)) });
     }
 
     // === РЕЖИМ 3: ПАУТИНА (Органический поиск по репостам) ===
@@ -156,8 +190,9 @@ export async function POST(request: Request) {
         }
       }
 
-      const links = cleanPublicLinks(Array.from(foundLinks));
-      return NextResponse.json({ links, ...(await saveFoundChannels(links)) });
+      const channels = await verifyChannels(cleanPublicLinks(Array.from(foundLinks)));
+      const links = channels.map(channel => channel.url);
+      return NextResponse.json({ links, channels, minSubscribers: 1000, ...(await saveFoundChannels(links)) });
     }
 
     return NextResponse.json({ error: 'Неизвестный режим' }, { status: 400 });
