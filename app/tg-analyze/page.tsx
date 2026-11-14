@@ -100,6 +100,10 @@ export default function TelegramAnalyzePage() {
           if (analyzeData.error) {
             analysisFailedCount++;
             addMessage('system', `[${link}] Сбой анализатора: ${analyzeData.error}`);
+            if (analyzeData.code === 'ANALYZER_CONFIG_MISSING') {
+              analyzerUnavailable = true;
+              addMessage('system', 'Анализ остановлен: отсутствуют настройки сервера. Найденные публичные адреса уже сохранены.');
+            }
           } else {
             analyzedCount++;
             const resultCard = (
