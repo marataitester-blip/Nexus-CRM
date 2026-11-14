@@ -19,13 +19,38 @@ const SEARCH_LOCALES = {
 } as const;
 type SearchLocale = keyof typeof SEARCH_LOCALES;
 
- // Сохранение адресов выполняется сразу после поиска, независимо от анализа.
+// Ads targeting requires public channel usernames; invitation URLs are not usable.
+const RESERVED_PATHS = new Set(['joinchat','share','addstickers','addemoji','proxy','socks','iv','login','faq','blog','apps','contact','confirmphone','setlanguage']);
+function publicChannelLink(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try {
+    const url = new URL(value);
+    if (!['t.me', 'www.t.me', 'telegram.me', 'www.telegram.me'].includes(url.hostname.toLowerCase())) return null;
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts[0]?.toLowerCase() === 's') parts.shift();
+    if (parts.length !== 1) return null;
+    const username = parts[0];
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{4,31}$/.test(username)) return null;
+    if (RESERVED_PATHS.has(username.toLowerCase())) return null;
+    return 'https://t.me/' + username;
+  } catch { return null; }
+}
+function cleanPublicLinks(values: unknown[]): string[] {
+  const unique = new Map<string, string>();
+  for (const value of values) {
+    const link = publicChannelLink(value);
+    if (link) unique.set(link.toLowerCase(), link);
+  }
+  return Array.from(unique.values()).slice(0, 6);
+}
+
+// Сохраняем только адреса публичных каналов, без invite-ссылок.
 async function saveFoundChannels(links: string[]) {
   const unique = new Map<string, string>();
   for (const link of links) {
-    const match = link.match(/^https?:\/\/(?:www\.)?t\.me\/(?:s\/)?([a-zA-Z][a-zA-Z0-9_]{4,31})(?:[/?#]|$)/i);
-    if (!match) continue;
-    const username = match[1];
+    const normalized = publicChannelLink(link);
+    if (!normalized) continue;
+    const username = normalized.slice('https://t.me/'.length);
     unique.set(username.toLowerCase(), username);
   }
   let savedCount = 0;
@@ -77,11 +102,7 @@ export async function POST(request: Request) {
         throw new Error(`Сбой Google Serper. Ответ сервера: ${JSON.stringify(data)}`);
       }
 
-      const links = data.organic
-        .map((item: any) => item.link)
-        .filter((link: string) => link.includes('t.me/'))
-        .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index)
-        .slice(0, 6);
+      const links = cleanPublicLinks(data.organic.map((item: any) => item.link));
 
       return NextResponse.json({ links, language, ...(await saveFoundChannels(links)) });
     }
@@ -100,9 +121,7 @@ export async function POST(request: Request) {
         throw new Error(`Сбой TGStat. Ответ сервера: ${JSON.stringify(data)}`);
       }
 
-      const links = data.response.items
-        .map((channel: any) => channel.link)
-        .slice(0, 6);
+      const links = cleanPublicLinks(data.response.items.map((channel: any) => channel.link));
         
       return NextResponse.json({ links, ...(await saveFoundChannels(links)) });
     }
@@ -137,7 +156,7 @@ export async function POST(request: Request) {
         }
       }
 
-      const links = Array.from(foundLinks).slice(0, 6);
+      const links = cleanPublicLinks(Array.from(foundLinks));
       return NextResponse.json({ links, ...(await saveFoundChannels(links)) });
     }
 
