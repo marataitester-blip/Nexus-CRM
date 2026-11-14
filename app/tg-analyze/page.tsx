@@ -62,7 +62,23 @@ export default function TelegramAnalyzePage() {
       // ИСПРАВЛЕНИЕ 2: Берем до 6 каналов за раз, как и договаривались
       const targetLinks = searchData.links.slice(0, 6);
 
-      addMessage('system', `Всего найдено целей: ${searchData.links.length}. В целях безопасности беру в работу первые ${targetLinks.length}. Начинаю глубокий анализ...`);
+      addMessage('system', `Найдено адресов: ${searchData.links.length}. Сохранено в базе: ${searchData.savedCount ?? 'неизвестно'}. Анализирую первые ${targetLinks.length}.`);
+      if (searchData.saveErrors?.length) {
+        addMessage('system', `Не удалось сохранить ${searchData.saveErrors.length} адресов. Проверь подключение базы данных.`);
+      }
+      addMessage('result', (
+        <div className="space-y-2">
+          <p className="text-yellow-600 font-bold">НАЙДЕННЫЕ АДРЕСА</p>
+          {searchData.links.map((link: string) => (
+            <div key={link}>
+              <a href={link} target="_blank" rel="noopener noreferrer"
+                 className="text-yellow-500 underline break-all">{link}</a>
+            </div>
+          ))}
+        </div>
+      ));
+      let analyzedCount = 0;
+      let analysisFailedCount = 0;
 
       // Поштучный анализ с искусственной паузой
       for (let i = 0; i < targetLinks.length; i++) {
@@ -80,8 +96,10 @@ export default function TelegramAnalyzePage() {
           const analyzeData = await analyzeRes.json();
 
           if (analyzeData.error) {
+            analysisFailedCount++;
             addMessage('system', `[${link}] Сбой анализатора: ${analyzeData.error}`);
           } else {
+            analyzedCount++;
             const resultCard = (
               <div className="border border-zinc-700 bg-black p-4 rounded mt-2 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
                 <a href={link} target="_blank" rel="noopener noreferrer" className="text-yellow-500 hover:text-yellow-400 hover:underline font-bold mb-3 inline-block tracking-wider">
@@ -108,6 +126,7 @@ export default function TelegramAnalyzePage() {
           }
           
         } catch (err) {
+          analysisFailedCount++;
           addMessage('system', `[${link}] Потеря связи с сервером во время анализа.`);
         }
 
@@ -118,7 +137,7 @@ export default function TelegramAnalyzePage() {
         }
       }
 
-      addMessage('system', 'Сеанс сканирования завершен. База данных лидов обновлена.');
+      addMessage('system', `Сканирование завершено. Успешно проанализировано: ${analyzedCount}. Ошибок анализа: ${analysisFailedCount}. Сохранение адресов не зависит от анализа.`);
 
     } catch (error: any) {
       addMessage('system', 'Критический сбой терминала.');
