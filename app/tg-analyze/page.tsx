@@ -80,6 +80,7 @@ export default function TelegramAnalyzePage() {
       ));
       let analyzedCount = 0;
       let analysisFailedCount = 0;
+      let analyzerUnavailable = false;
 
       // Поштучный анализ с искусственной паузой
       for (let i = 0; i < targetLinks.length; i++) {
@@ -99,6 +100,10 @@ export default function TelegramAnalyzePage() {
           if (analyzeData.error) {
             analysisFailedCount++;
             addMessage('system', `[${link}] Сбой анализатора: ${analyzeData.error}`);
+            if (analyzeData.code === 'ANALYZER_CONFIG_MISSING') {
+              analyzerUnavailable = true;
+              addMessage('system', 'Анализ остановлен: отсутствуют настройки сервера. Найденные публичные адреса уже сохранены.');
+            }
           } else {
             analyzedCount++;
             const resultCard = (
@@ -130,6 +135,8 @@ export default function TelegramAnalyzePage() {
           analysisFailedCount++;
           addMessage('system', `[${link}] Потеря связи с сервером во время анализа.`);
         }
+
+        if (analyzerUnavailable) break;
 
         // Пауза 6 секунд между запросами (кроме последнего)
         if (i < targetLinks.length - 1) {
