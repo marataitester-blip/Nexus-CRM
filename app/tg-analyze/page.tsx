@@ -8,9 +8,6 @@ type Message = {
   content: string | React.ReactNode;
 };
 
-// Функция искусственной задержки
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
 export default function TelegramAnalyzePage() {
   const [prompt, setPrompt] = useState('');
   const [mode, setMode] = useState<1 | 2 | 3>(1); // 1: Google, 2: TGStat, 3: Spider
@@ -60,10 +57,7 @@ export default function TelegramAnalyzePage() {
         return;
       }
 
-      // ИСПРАВЛЕНИЕ 2: Берем до 6 каналов за раз, как и договаривались
-      const targetLinks = searchData.links.slice(0, 6);
-
-      addMessage('system', `Найдено адресов: ${searchData.links.length}. Сохранено в базе: ${searchData.savedCount ?? 'неизвестно'}. Анализирую первые ${targetLinks.length}.`);
+      addMessage('system', `Найдено адресов: ${searchData.links.length}. Сохранено в базе: ${searchData.savedCount ?? 'неизвестно'}. Анализ ИИ отключён: дополнительные запросы не выполняются.`);
       if (searchData.saveErrors?.length) {
         addMessage('system', `Не удалось сохранить ${searchData.saveErrors.length} адресов. Проверь подключение базы данных.`);
       }
@@ -78,74 +72,7 @@ export default function TelegramAnalyzePage() {
           ))}
         </div>
       ));
-      let analyzedCount = 0;
-      let analysisFailedCount = 0;
-      let analyzerUnavailable = false;
-
-      // Поштучный анализ с искусственной паузой
-      for (let i = 0; i < targetLinks.length; i++) {
-        const link = targetLinks[i];
-        
-        try {
-          addMessage('system', `[${i+1}/${targetLinks.length}] Сканирую ${link}...`);
-          
-          const analyzeRes = await fetch('/api/tg/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channelUrl: link }),
-          });
-          
-          const analyzeData = await analyzeRes.json();
-
-          if (analyzeData.error) {
-            analysisFailedCount++;
-            addMessage('system', `[${link}] Сбой анализатора: ${analyzeData.error}`);
-            if (analyzeData.code === 'ANALYZER_CONFIG_MISSING') {
-              analyzerUnavailable = true;
-              addMessage('system', 'Анализ остановлен: отсутствуют настройки сервера. Найденные публичные адреса уже сохранены.');
-            }
-          } else {
-            analyzedCount++;
-            const resultCard = (
-              <div className="border border-zinc-700 bg-black p-4 rounded mt-2 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-                <a href={link} target="_blank" rel="noopener noreferrer" className="text-yellow-500 hover:text-yellow-400 hover:underline font-bold mb-3 inline-block tracking-wider">
-                  {link.replace('https://t.me/', '@')}
-                </a>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="bg-zinc-900 border border-zinc-800 p-2 text-center rounded">
-                    <span className="block text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Вердикт Мессира</span>
-                    <span className={`text-2xl font-bold ${analyzeData.aiScore >= 8 ? 'text-green-500' : analyzeData.aiScore >= 5 ? 'text-yellow-500' : 'text-red-500'}`}>
-                      {analyzeData.aiScore} / 10
-                    </span>
-                  </div>
-                  <div className="bg-zinc-900 border border-zinc-800 p-2 text-center rounded">
-                    <span className="block text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Вовлеченность (ER)</span>
-                    <span className="text-2xl font-bold text-white">{analyzeData.er}%</span>
-                  </div>
-                </div>
-                <p className="text-sm text-zinc-300 border-l-2 border-yellow-700 pl-3 py-1 font-sans leading-relaxed">
-                  {analyzeData.comment}
-                </p>
-              </div>
-            );
-            addMessage('result', resultCard);
-          }
-          
-        } catch (err) {
-          analysisFailedCount++;
-          addMessage('system', `[${link}] Потеря связи с сервером во время анализа.`);
-        }
-
-        if (analyzerUnavailable) break;
-
-        // Пауза 6 секунд между запросами (кроме последнего)
-        if (i < targetLinks.length - 1) {
-          addMessage('system', '⏳ Скрываю следы... Ожидание 6 секунд перед следующей целью...');
-          await sleep(6000);
-        }
-      }
-
-      addMessage('system', `Сканирование завершено. Успешно проанализировано: ${analyzedCount}. Ошибок анализа: ${analysisFailedCount}. Сохранение адресов не зависит от анализа.`);
+      addMessage('system', 'Поиск завершён. Проверьте найденные каналы вручную перед запуском рекламы.');
 
     } catch (error: any) {
       addMessage('system', 'Критический сбой терминала.');
@@ -167,7 +94,7 @@ export default function TelegramAnalyzePage() {
         
         {/* Шапка */}
         <div className="bg-zinc-950 border-b border-yellow-900 p-4">
-          <h1 className="text-xl uppercase tracking-widest font-bold text-yellow-600 mb-4 text-center">Терминал Мессира: Захват Лидов</h1>
+          <h1 className="text-xl uppercase tracking-widest font-bold text-yellow-600 mb-4 text-center">NEXUS · Поиск Telegram-каналов</h1>
           {mode === 1 && (
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <label htmlFor="search-language" className="text-xs text-zinc-400">Язык и рынок поиска</label>
